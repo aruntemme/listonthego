@@ -187,6 +187,7 @@ function App() {
   // Note selection handler for dashboard
   const handleSelectNote = (note: Note) => {
     setSelectedNote(note);
+    console.log('Selected note:', selectedNote);
   };
 
   const renderActiveTab = () => {

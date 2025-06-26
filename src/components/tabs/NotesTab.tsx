@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Loader2, ChevronRight, Zap, X, Edit, Maximize2, LayoutDashboard } from 'lucide-react';
+import { Plus, FileText, Loader2, ChevronRight, Zap, X, Edit, Maximize2 } from 'lucide-react';
 import { Note, Todo } from '../../types';
 import { LLMService } from '../../services/llmService';
 

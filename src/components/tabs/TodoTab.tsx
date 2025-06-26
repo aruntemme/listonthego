@@ -83,12 +83,8 @@ const CommonInput: React.FC<{
   error: string | null;
   handleExtractTodos: () => void;
 }> = ({ inputText, setInputText, isExtracting, error, handleExtractTodos }) => (
-  <>
-    {/* Gradient blur overlay */}
-    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-100/95 via-gray-100/60 via-gray-100/10 to-transparent backdrop-blur-md pointer-events-none" />
-    
-    <div className="absolute bottom-0 left-0 right-0 p-4">
-      <div className="max-w-3xl">
+  <div className="space-y-4">
+    <div className="relative w-full">
       <textarea
         value={inputText}
         onChange={(e) => setInputText(e.target.value)}
@@ -123,18 +119,17 @@ const CommonInput: React.FC<{
     </div>
     
     {error && (
-      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium flex items-center gap-2 max-w-4xl mx-auto">
+      <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium flex items-center gap-2">
         <X size={14} />
         {error}
       </div>
     )}
     
     {/* Hint text */}
-    <div className="mt-2 text-xs text-gray-500 text-center">
+    <div className="text-xs text-gray-500 text-center">
       Press ⌘+Enter to extract todos
     </div>
-    </div>
-  </>
+  </div>
 );
 
 // Tab Switch Component
@@ -418,7 +413,7 @@ const TodoTab: React.FC<TodoTabProps> = ({
     <div className="flex-1 flex h-screen bg-gray-100 relative">
       {/* Main content area (2/3) */}
       <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto pb-40">
+        <div className="flex-1 overflow-y-auto">
           <div className="px-6 py-4">
             {/* Header */}
             <div className="mb-8">
@@ -560,17 +555,19 @@ const TodoTab: React.FC<TodoTabProps> = ({
               )}
             </div>
 
-            {/* Single Common Input Area - spans full width at bottom */}
-            <CommonInput
-              inputText={inputText}
-              setInputText={setInputText}
-              isExtracting={isExtracting}
-              error={error}
-              handleExtractTodos={handleExtractTodos}
-            />
           </div>
         </div>
 
+        {/* Sticky Input Area at bottom of main content */}
+        <div className="sticky bottom-0 bg-gray-100 border-t border-gray-200 px-6 py-4">
+          <CommonInput
+            inputText={inputText}
+            setInputText={setInputText}
+            isExtracting={isExtracting}
+            error={error}
+            handleExtractTodos={handleExtractTodos}
+          />
+        </div>
       </div>
 
       {/* Filters and Operations Sidebar (1/3) */}

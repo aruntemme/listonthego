@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 font-['Inter'] antialiased;
+  }
+}
+
+
+@layer components {
+  .drag-region {
+    position: fixed;
+    top: 0;
+    left: 70px; /* Leave space for macOS traffic light buttons */
+    right: 0;
+    height: 30px;
+    z-index: 1000;
+    background: transparent;
+  }
+  
+  .drag-region:active {
+    cursor: grabbing;
+  }
+  
+  /* Main content area without top padding */
+  .app-content {
+    height: 100vh;
+  }
+  
+  /* Content area that needs to avoid the drag region */
+  .main-content {
+    overflow: hidden;
+    border-radius: 16px 0 16px 0; /* Curved top-left corner */
+    margin-top: 10px; /* Space from top */
+  }
+  
+  /* Sidebar container */
+  .sidebar-container {
+    height: 100vh;
+  }
+  
+  .card {
+    @apply bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .card-minimal {
+    @apply bg-white border border-gray-100 rounded-xl p-4 hover:border-gray-200 transition-colors duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-gray-800 transition-all duration-200 font-medium shadow-sm hover:shadow-md;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium;
+  }
+  
+  .btn-minimal {
+    @apply bg-transparent text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-100 hover:text-gray-800 transition-all duration-200 text-sm font-medium;
+  }
+  
+  .input-field {
+    @apply w-full p-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200 bg-gray-50 font-medium placeholder-gray-400;
+  }
+  
+  .textarea-field {
+    @apply w-full p-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none transition-all duration-200 bg-gray-50 font-normal placeholder-gray-400;
+  }
+  
+  .todo-item {
+    @apply bg-white border border-gray-100 rounded-xl p-4 hover:border-gray-200 hover:shadow-sm transition-all duration-200;
+  }
+  
+  .todo-item.completed {
+    @apply bg-gray-50 border-gray-100;
+  }
+  
+  .checkbox {
+    @apply w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-all duration-200 hover:border-gray-400;
+  }
+  
+  .checkbox.checked {
+    @apply bg-gray-900 border-gray-900 text-white;
+  }
+  
+  .section-header {
+    @apply text-xl font-semibold text-gray-900 mb-6;
+  }
+  
+  .section-subheader {
+    @apply text-sm font-medium text-gray-600 mb-4 uppercase tracking-wide;
+  }
+
+  /* Line clamp utilities for text truncation */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Custom scrollbar styles for widgets */
+  .widget-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .widget-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .widget-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.3);
+    border-radius: 3px;
+  }
+
+  .widget-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.5);
+  }
+} 

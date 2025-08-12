@@ -84,6 +84,7 @@ async fn call_llm_api(request: LLMRequest) -> Result<LLMResponse, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![greet, call_llm_api])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,30 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, Plus, Target, Check, X, Edit3, Trash2, Clock, Award } from 'lucide-react';
-import { Habit, HabitLog, HabitCategory } from '../../types';
+import { 
+  Calendar, Plus, Target, Check, X, Edit3, Trash2, Clock, Award, 
+  Bell, Lightbulb, BarChart3, List, TrendingUp,
+  Share, ChevronLeft, ChevronRight
+} from 'lucide-react';
+import { Habit, HabitLog, HabitCategory, HabitTemplate, HabitReminder, HabitInsight } from '../../types';
 import indexedDBService from '../../services/indexedDBService';
+import habitTemplatesService from '../../services/habitTemplatesService';
+import habitAnalyticsService from '../../services/habitAnalyticsService';
+import habitImportExportService from '../../services/habitImportExportService';
+import habitRemindersService from '../../services/habitRemindersService';
+import habitCalendarService, { CalendarMonth } from '../../services/habitCalendarService';
+
+type ViewMode = 'list' | 'calendar' | 'analytics';
 
 const HabitTab: React.FC = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
   const [categories, setCategories] = useState<HabitCategory[]>([]);
+  const [templates, setTemplates] = useState<HabitTemplate[]>([]);
+  const [insights, setInsights] = useState<HabitInsight[]>([]);
+  const [reminders, setReminders] = useState<HabitReminder[]>([]);
+  
+  // UI State
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
-
+  
+  // Calendar state
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarData, setCalendarData] = useState<CalendarMonth | null>(null);
 
   // Default categories
   const defaultCategories: HabitCategory[] = [
-    { id: '1', name: 'Health', color: '#000000', icon: 'heart' },
-    { id: '2', name: 'Learning', color: '#374151', icon: 'book' },
-    { id: '3', name: 'Fitness', color: '#6B7280', icon: 'activity' },
-    { id: '4', name: 'Mindfulness', color: '#9CA3AF', icon: 'brain' },
-    { id: '5', name: 'Productivity', color: '#4B5563', icon: 'target' },
+    { id: '1', name: 'Health', color: '#000000', icon: 'heart', description: 'Physical and mental wellbeing' },
+    { id: '2', name: 'Learning', color: '#374151', icon: 'book', description: 'Education and skill development' },
+    { id: '3', name: 'Fitness', color: '#6B7280', icon: 'activity', description: 'Physical exercise and movement' },
+    { id: '4', name: 'Mindfulness', color: '#9CA3AF', icon: 'brain', description: 'Mental clarity and meditation' },
+    { id: '5', name: 'Productivity', color: '#4B5563', icon: 'target', description: 'Work and personal productivity' },
   ];
 
-  // Load data from IndexedDB
+  // Load data and initialize services
   useEffect(() => {
     const loadData = async () => {
       try {
         await indexedDBService.init();
+        await habitRemindersService.init();
         
         // Load habits
         const loadedHabits = await indexedDBService.getAllHabits();
@@ -43,12 +66,30 @@ const HabitTab: React.FC = () => {
           await indexedDBService.saveHabitCategories(defaultCategories);
         }
 
+        // Load templates
+        setTemplates(habitTemplatesService.getPopularTemplates());
+
+        // Load reminders
+        setReminders(habitRemindersService.getAllReminders());
+        console.log(reminders);
+
+        // Generate insights
+        const habitInsights = loadedHabits.map(habit => {
+          const analytics = habitAnalyticsService.calculateAnalytics(habit, loadedLogs);
+          return habitAnalyticsService.generateInsights(habit, analytics, loadedHabits);
+        }).flat();
+        
+        const overallInsights = habitAnalyticsService.getOverallInsights(loadedHabits, loadedLogs);
+        setInsights([...habitInsights, ...overallInsights]);
+
+        // Generate calendar data
+        updateCalendarData(currentDate, loadedHabits, loadedLogs);
+
         // Migrate data if needed
         await indexedDBService.migrateFromLocalStorage();
         
       } catch (error) {
         console.error('Failed to load habit data:', error);
-        // Fallback to default categories
         setCategories(defaultCategories);
       }
     };
@@ -56,7 +97,20 @@ const HabitTab: React.FC = () => {
     loadData();
   }, []);
 
-  // Note: Data is now automatically saved to IndexedDB in individual operations
+  // Update calendar when date changes
+  useEffect(() => {
+    updateCalendarData(currentDate, habits, habitLogs);
+  }, [currentDate, habits, habitLogs]);
+
+  const updateCalendarData = (date: Date, habitsData: Habit[], logsData: HabitLog[]) => {
+    const calData = habitCalendarService.generateCalendarMonth(
+      date.getFullYear(),
+      date.getMonth(),
+      habitsData,
+      logsData
+    );
+    setCalendarData(calData);
+  };
 
   const addHabit = async (habitData: Omit<Habit, 'id' | 'streak' | 'createdAt'>) => {
     const newHabit: Habit = {
@@ -72,6 +126,28 @@ const HabitTab: React.FC = () => {
       setShowAddForm(false);
     } catch (error) {
       console.error('Failed to save habit:', error);
+    }
+  };
+
+  const addHabitFromTemplate = async (template: HabitTemplate) => {
+    const newHabit: Habit = {
+      id: Date.now().toString(),
+      name: template.name,
+      description: template.description,
+      frequency: template.frequency,
+      category: template.category,
+      goal: template.goal,
+      streak: 0,
+      createdAt: new Date(),
+      color: template.color,
+    };
+    
+    try {
+      await indexedDBService.saveHabit(newHabit);
+      setHabits([...habits, newHabit]);
+      setShowTemplates(false);
+    } catch (error) {
+      console.error('Failed to save habit from template:', error);
     }
   };
 
@@ -105,7 +181,6 @@ const HabitTab: React.FC = () => {
       let updatedLogs;
       
       if (existingLog) {
-        // Toggle existing log
         const updatedLog = { ...existingLog, completed: !existingLog.completed };
         await indexedDBService.saveHabitLog(updatedLog);
         
@@ -114,7 +189,6 @@ const HabitTab: React.FC = () => {
         );
         setHabitLogs(updatedLogs);
       } else {
-        // Create new log
         const newLog: HabitLog = {
           id: Date.now().toString(),
           habitId,
@@ -130,7 +204,6 @@ const HabitTab: React.FC = () => {
       // Update habit streak and lastCompleted
       const habit = habits.find(h => h.id === habitId);
       if (habit) {
-        // Calculate streak with updated logs
         const newStreak = calculateStreak(habitId, updatedLogs);
         const updatedHabit = {
           ...habit,
@@ -178,55 +251,308 @@ const HabitTab: React.FC = () => {
     return log?.completed || false;
   };
 
-  return (
-    <div className="flex-1 h-screen bg-gray-100 overflow-hidden">
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-start flex-col">
-              <h1 className="text-2xl font-semibold text-black">Habit Tracker</h1>
-              <p className="text-sm text-gray-500">Track your daily habits and build powerful streaks</p>
-            </div>
+  // Since category filtering was removed, show all habits
+  const filteredHabits = habits;
+
+  // Export functions
+  const handleExportJSON = async () => {
+    try {
+      const data = await habitImportExportService.exportToJSON(habits, habitLogs, categories);
+      const filename = habitImportExportService.generateFilename('json');
+      habitImportExportService.downloadAsFile(data, filename, 'application/json');
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const data = await habitImportExportService.exportToCSV(habits, habitLogs);
+      const filename = habitImportExportService.generateFilename('csv');
+      habitImportExportService.downloadAsFile(data, filename, 'text/csv');
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      if (file.type === 'application/json') {
+        const { habits: importedHabits, logs: importedLogs, categories: importedCategories } = 
+          await habitImportExportService.importFromJSON(text);
+        
+        // Add imported habits with new IDs to avoid conflicts
+        const newHabits = importedHabits.map(h => ({ ...h, id: Date.now().toString() + Math.random() }));
+        setHabits([...habits, ...newHabits]);
+        setHabitLogs([...habitLogs, ...importedLogs]);
+        setCategories([...categories, ...importedCategories]);
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert('Failed to import file. Please check the format and try again.');
+    }
+  };
+
+  const navigateCalendar = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    if (direction === 'prev') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const renderToolbar = () => (
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-semibold text-black">Habit Tracker</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`p-2 rounded-lg ${viewMode === 'calendar' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}
+          >
+            <Calendar size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`p-2 rounded-lg ${viewMode === 'analytics' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}
+          >
+            <BarChart3 size={16} />
+          </button>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2">
+
+        
+        <button
+          onClick={() => setShowTemplates(true)}
+          className="btn-secondary flex items-center gap-2"
+        >
+          <Lightbulb size={16} />
+          Templates
+        </button>
+        
+
+        <button
+          onClick={() => setShowImportExport(true)}
+          className="btn-secondary flex items-center gap-2"
+        >
+          <Share size={16} />
+          Export
+        </button>
+        
+        <button
+          onClick={async () => {
+            try {
+              await habitRemindersService.testNotification();
+              alert('Test notification sent! Check your system notifications.');
+            } catch (error) {
+              alert('Failed to send notification. Please check permissions.');
+            }
+          }}
+          className="btn-secondary flex items-center gap-2"
+        >
+          <Bell size={16} />
+          Test Alert
+        </button>
+        
+        <button
+          onClick={async () => {
+            try {
+              // Create a reminder for 10 seconds from now
+              const testTime = new Date();
+              testTime.setSeconds(testTime.getSeconds() + 10);
+              const timeString = testTime.toTimeString().slice(0, 5);
+              
+              const quickReminder = habitRemindersService.createCustomReminder(
+                'demo-habit',
+                timeString,
+                [testTime.getDay()], // Today's day of week
+                '🚀 Scheduled notification test! This was created 10 seconds ago.'
+              );
+              
+              await habitRemindersService.addReminder(quickReminder);
+              alert('Scheduled notification created! You should see it in 10 seconds.');
+              
+              // Clean up after 15 seconds
+              setTimeout(async () => {
+                await habitRemindersService.deleteReminder(quickReminder.id);
+              }, 15000);
+            } catch (error) {
+              alert('Failed to schedule notification: ' + error);
+            }
+          }}
+          className="btn-secondary flex items-center gap-2"
+        >
+          <Clock size={16} />
+          Schedule Test
+        </button>
+        
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus size={16} />
+          Add Habit
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderCalendarView = () => {
+    if (!calendarData) return <div>Loading calendar...</div>;
+
+    return (
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">{calendarData.monthName} {calendarData.year}</h2>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowAddForm(true)}
-              className="btn-primary flex items-center gap-2"
+              onClick={() => navigateCalendar('prev')}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
             >
-              <Plus size={16} />
-              Add Habit
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => navigateCalendar('next')}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+            >
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
+        
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="p-3 text-center text-sm font-medium text-gray-500">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {calendarData.weeks.map(week =>
+            week.days.map(day => (
+              <div
+                key={day.date.toISOString()}
+                className={`
+                  p-3 min-h-[80px] border rounded-lg cursor-pointer transition-colors
+                  ${day.isCurrentMonth ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'}
+                  ${day.isToday ? 'ring-2 ring-black' : ''}
+                  hover:bg-gray-50
+                `}
+              >
+                <div className="text-sm font-medium mb-1">
+                  {day.date.getDate()}
+                </div>
+                <div className="space-y-1">
+                  {day.habits.slice(0, 3).map(habitData => (
+                    <div
+                      key={habitData.habit.id}
+                      className={`
+                        w-full h-1 rounded
+                        ${habitData.completed ? 'bg-black' : 'bg-gray-200'}
+                      `}
+                    />
+                  ))}
+                  {day.habits.length > 3 && (
+                    <div className="text-xs text-gray-500">
+                      +{day.habits.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>Completion rate: {Math.round((calendarData.completedDays / calendarData.totalDays) * 100)}%</span>
+          <span>{calendarData.completedDays} of {calendarData.totalDays} days active</span>
+        </div>
+      </div>
+    );
+  };
 
-        {/* Content */}
-        <div className="flex-1 p-6 overflow-auto">
-          {habits.length === 0 ? (
-            <EmptyState onAddHabit={() => setShowAddForm(true)} />
-          ) : (
-            <div className="space-y-6">
-              {/* Stats Overview */}
+  const renderAnalyticsView = () => (
+    <div className="space-y-6">
+      {insights.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg font-semibold mb-4">Insights & Recommendations</h3>
+          <div className="space-y-3">
+            {insights.slice(0, 5).map(insight => (
+              <div key={insight.id} className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium text-black">{insight.title}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{insight.description}</p>
+                    {insight.suggestion && (
+                      <p className="text-sm text-blue-600 mt-2">{insight.suggestion}</p>
+                    )}
+                  </div>
+                  {insight.value && (
+                    <span className="text-lg font-semibold text-black">{insight.value}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      <StatsOverview habits={habits} habitLogs={habitLogs} />
+    </div>
+  );
+
+  return (
+    <div className="flex-1 h-screen bg-gray-100 overflow-hidden">
+      <div className="h-full flex flex-col">
+        <div className="px-6 py-4">
+          {renderToolbar()}
+        </div>
+
+        <div className="flex-1 px-6 pb-6 overflow-auto">
+          {viewMode === 'calendar' && renderCalendarView()}
+          {viewMode === 'analytics' && renderAnalyticsView()}
+          {(viewMode === 'list') && (
+            <>
               <StatsOverview habits={habits} habitLogs={habitLogs} />
               
-              {/* Habit Cards */}
-              <div className="space-y-4">
-                {habits.map(habit => (
-                  <HabitCard
-                    key={habit.id}
-                    habit={habit}
-                    categories={categories}
-                    onToggleComplete={toggleHabitComplete}
-                    onEdit={setEditingHabit}
-                    onDelete={deleteHabit}
-                    getHabitCompletion={getHabitCompletion}
-                  />
-                ))}
-              </div>
-            </div>
+              {filteredHabits.length === 0 ? (
+                <EmptyState onAddHabit={() => setShowAddForm(true)} />
+              ) : (
+                <div className={'space-y-4 pt-6'}>
+                  {filteredHabits.map(habit => (
+                    <HabitCard
+                      key={habit.id}
+                      habit={habit}
+                      categories={categories}
+                      onToggleComplete={toggleHabitComplete}
+                      onEdit={setEditingHabit}
+                      onDelete={deleteHabit}
+                      getHabitCompletion={getHabitCompletion}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Add/Edit Habit Modal */}
+      {/* Modals */}
       {(showAddForm || editingHabit) && (
         <HabitModal
           habit={editingHabit}
@@ -236,6 +562,23 @@ const HabitTab: React.FC = () => {
             setShowAddForm(false);
             setEditingHabit(null);
           }}
+        />
+      )}
+
+      {showTemplates && (
+        <TemplatesModal
+          templates={templates}
+          onSelectTemplate={addHabitFromTemplate}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
+
+      {showImportExport && (
+        <ImportExportModal
+          onExportJSON={handleExportJSON}
+          onExportCSV={handleExportCSV}
+          onImport={handleImportFile}
+          onClose={() => setShowImportExport(false)}
         />
       )}
     </div>
@@ -575,6 +918,93 @@ const HabitModal: React.FC<{
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+// Templates Modal Component
+const TemplatesModal: React.FC<{
+  templates: HabitTemplate[];
+  onSelectTemplate: (template: HabitTemplate) => void;
+  onClose: () => void;
+}> = ({ templates, onSelectTemplate, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-black">
+            Select a Template
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {templates.map(template => (
+            <button
+              key={template.id}
+              onClick={() => onSelectTemplate(template)}
+              className="w-full btn-secondary"
+            >
+              {template.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Import/Export Modal Component
+const ImportExportModal: React.FC<{
+  onExportJSON: () => void;
+  onExportCSV: () => void;
+  onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onClose: () => void;
+}> = ({ onExportJSON, onExportCSV, onImport, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-black">
+            Export Habits
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <button
+            onClick={onExportJSON}
+            className="w-full btn-secondary"
+          >
+            Export as JSON
+          </button>
+          <button
+            onClick={onExportCSV}
+            className="w-full btn-secondary"
+          >
+            Export as CSV
+          </button>
+          <label className="block text-sm font-medium text-black mb-1">
+            Import Habits
+          </label>
+          <input
+            type="file"
+            accept=".json"
+            onChange={onImport}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+          />
+        </div>
       </div>
     </div>
   );
